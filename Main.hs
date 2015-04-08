@@ -4,25 +4,22 @@ import Control.Applicative
 import Control.Concurrent (threadDelay)
 import Control.Exception
 import Control.Monad      (forM_, forever)
+import Control.Monad.IO.Class
 
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Read 
-
 import Data.IORef
-
 import Database.InfluxDB hiding((.:))
 import Database.InfluxDB.Encode
+import Data.Yaml
+import qualified Data.Vector as V
 
 import Network.HTTP.Client
-
-import qualified Data.Vector as V
 
 import Prelude hiding (FilePath)
 
 import Shelly
-
-import Data.Yaml
 
 default (Text)
 
@@ -86,12 +83,6 @@ instance FromJSON InfluxDBServer where
     m .: "infport"
   parseJSON x = fail ("not an object: " ++ show x)
 
-myServer :: Server
-myServer =  Server "127.0.0.1" 8086 False
-
-poolServer :: IO (IORef ServerPool) 
-poolServer = newServerPool myServer []
-
 myCredentials :: Credentials
 myCredentials = Credentials "root" "root"
 
@@ -138,16 +129,20 @@ treatResult :: Config -> Text -> Either Int Text -> IO ()
 treatResult c t (Right x) = insertToDB c t        $ readHTTPReq x
 treatResult c t (Left e)  = insertToDB c "error"  $ Error e
 
+request :: MonadIO m => Text -> m (Either Int Text)
 request url = shelly $ errExit False $ runCmd url
 
+runCDNTest :: Config -> CDN -> IO ()
 runCDNTest cinf cdn = do
   r <- mapM request (urls cdn)
   mapM_ (treatResult cinf (name cdn)) r
 
+loop :: MyConfig -> Config -> IO ()
 loop c cinf = forever $ do 
   mapM_ (runCDNTest cinf) (cdns c)
   threadDelay 5000000 -- 5 seconds
 
+doRun :: MyConfig -> IO ()
 doRun cfg = do
   let settings    = infserver cfg
       server      = Server (infhost settings) (infport settings) False
@@ -160,6 +155,7 @@ readMyConfig =
     either (error . show) id <$>
         decodeFileEither "cfg.yaml"
 
+main :: IO ()
 main = do 
   conf <- readMyConfig
   print conf
