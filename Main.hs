@@ -115,7 +115,6 @@ curlNull :: [Text]
 curlNull = ["-o", "/dev/null"]
 
 curl :: Text -> Sh Text
--- curl url = run "curl" ["-w", "@curl-format.txt", "-o",  "/dev/null", "-s", url]
 curl url = run "curl" $ curlNull ++ curlFormat ++ ["-s"] ++ [url]
 
 readValue :: [Text] -> Double
@@ -132,17 +131,9 @@ readHTTPReq t = extractValues values
   where 
     values = map readValue $ map T.words (T.lines t)
 
---insertToDB :: ToSeriesData r => Text -> r -> IO ()
 insertToDB :: ToSeriesData r => Config -> Text -> r -> IO ()
 insertToDB conf t http = do 
   post conf myDB $ writeSeries t $ http
-
---insertToDB t http = do 
---  myPoolServer <- poolServer
---  myManager <- newManager defaultManagerSettings
---  let config = Config myCredentials myPoolServer myManager
---      series = writeSeries t $ http
---  post config myDB series
 
 runCmd :: Text -> Sh (Either Int Text)
 runCmd l = do
@@ -157,17 +148,13 @@ treatResult :: Config -> Text -> Either Int Text -> IO ()
 treatResult c t (Right x) = insertToDB c t        $ readHTTPReq x
 treatResult c t (Left e)  = insertToDB c "error"  $ Error e
 
---request :: Control.Monad.IO.Class.MonadIO m => Text -> m (Either Int Text)
 request url = shelly $ errExit False $ runCmd url
 
--- runCMDTest :: InfluxDBServer -> CDN -> IO [Either Int Text]
 runCDNTest cinf cdn = do
   r <- mapM request (urls cdn)
-  -- return $ r
   mapM_ (treatResult cinf (name cdn)) r
 
 loop c cinf = forever $ do 
-  -- mapM (runCDNTest cinf) (cdns c)
   mapM_ (runCDNTest cinf) (cdns c)
   threadDelay 5000000 -- 5 seconds
 
@@ -177,13 +164,6 @@ doRun cfg = do
   myPoolServer  <- newServerPool server []
   myManager     <- newManager defaultManagerSettings
   loop cfg $ Config myCredentials myPoolServer myManager
-
---main = forever $ do
---  r <- shelly $ errExit False $ runCmd "http://pool.img.aptoide.com/imgs/d/9/8/d980fe54d4d0bda21091af8ca6cee334_cat_graphic.png"
---  case r of 
---    Right x -> insertToDB "test"  $ readHTTPReq x
---    Left e  -> insertToDB "error" $ Error e
---  threadDelay 5000000 -- 5 seconds
 
 readMyConfig :: IO MyConfig
 readMyConfig =
