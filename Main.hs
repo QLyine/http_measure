@@ -26,9 +26,6 @@ import Data.Yaml
 
 default (Text)
 
-data Event = Event Int 
-  deriving (Show)
-
 data Error = Error Int
   deriving (Show)
 
@@ -70,10 +67,6 @@ instance ToSeriesData Error where
   toSeriesColumns _ = V.fromList ["code"]
   toSeriesPoints (Error i) = V.fromList [toValue i]
 
-instance ToSeriesData Event where
-  toSeriesColumns _ = V.fromList ["count"]
-  toSeriesPoints (Event i) = V.fromList [toValue i]
-
 instance FromJSON MyConfig where
   parseJSON (Object m) = MyConfig <$>
     m .: "continent" <*>
@@ -104,9 +97,6 @@ myCredentials = Credentials "root" "root"
 
 myDB :: Text 
 myDB = "data"
-
-myEvent :: Int -> IO Event
-myEvent i = return $ Event i
 
 curlFormat :: [Text]
 curlFormat = ["-w", "@curl-format.txt"]
