@@ -2,6 +2,7 @@
 
 import Control.Applicative
 import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (withAsync, waitCatch)
 import Control.Exception
 import Control.Monad      (forM_, forever)
 import Control.Monad.IO.Class
@@ -83,6 +84,12 @@ instance FromJSON InfluxDBServer where
     m .: "infport"
   parseJSON x = fail ("not an object: " ++ show x)
 
+tryAny :: IO a -> IO (Either SomeException a)
+tryAny action = withAsync action waitCatch
+
+catchAny :: IO a -> (SomeException -> IO a) -> IO a
+catchAny action onE = tryAny action >>= either onE return
+
 myCredentials :: Credentials
 myCredentials = Credentials "root" "root"
 
@@ -113,8 +120,8 @@ readHTTPReq t = extractValues values
     values = map readValue $ map T.words (T.lines t)
 
 insertToDB :: ToSeriesData r => Config -> Text -> r -> IO ()
-insertToDB conf t http = do 
-  post conf myDB $ writeSeries t $ http
+insertToDB conf t http = 
+   catchAny (post conf myDB $ writeSeries t $ http) (\e -> print e)
 
 runCmd :: Text -> Sh (Either Int Text)
 runCmd l = do
@@ -144,11 +151,12 @@ loop c cinf = forever $ do
 
 doRun :: MyConfig -> IO ()
 doRun cfg = do
-  let settings    = infserver cfg
-      server      = Server (infhost settings) (infport settings) False
   myPoolServer  <- newServerPool server []
   myManager     <- newManager defaultManagerSettings
   loop cfg $ Config myCredentials myPoolServer myManager
+  where
+    settings  = infserver cfg
+    server    = Server (infhost settings) (infport settings) False
 
 readMyConfig :: IO MyConfig
 readMyConfig =
