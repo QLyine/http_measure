@@ -123,25 +123,24 @@ insertToDB :: ToSeriesData r => Config -> Text -> r -> IO ()
 insertToDB conf t http = 
    catchAny (post conf myDB $ writeSeries t $ http) (\e -> print e)
 
-runCmd :: Text -> Sh (Either Int Text)
-runCmd l = do
-  c <- curl l
-  e <- lastExitCode
-  let r = case e of
-            0 -> Right c
-            _ -> Left e
-  return r
+treatException e = do
+  print e
+  errC <- shelly $ lastExitCode 
+  return $ Left errC
+
+runCmd :: Text -> IO (Either Int Text)
+runCmd l = catchAny (action) (err)
+  where 
+    action  = (shelly (curl l)) >>= return . Right
+    err     = treatException
 
 treatResult :: Config -> Text -> Either Int Text -> IO ()
 treatResult c t (Right x) = insertToDB c t        $ readHTTPReq x
 treatResult c t (Left e)  = insertToDB c "error"  $ Error e
 
-request :: MonadIO m => Text -> m (Either Int Text)
-request url = shelly $ errExit False $ runCmd url
-
 runCDNTest :: Config -> CDN -> IO ()
 runCDNTest cinf cdn = do
-  r <- mapM request (urls cdn)
+  r <- mapM runCmd (urls cdn)
   mapM_ (treatResult cinf (name cdn)) r
 
 loop :: MyConfig -> Config -> IO ()
