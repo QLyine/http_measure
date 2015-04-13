@@ -124,7 +124,7 @@ insertToDB conf t http =
    catchAny (post conf myDB $ writeSeries t $ http) (\e -> print e)
 
 treatException e = do
-  print e
+  putStrLn $ "ERROR >>= " ++ (show e)
   errC <- shelly $ lastExitCode 
   return $ Left errC
 
