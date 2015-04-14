@@ -1,4 +1,5 @@
 continent: "Europe"
+interval: 120 # seconds
 cdns: 
   -
     name: "pool.img.aptoide.com"
@@ -7,7 +8,7 @@ cdns:
   - 
     name: "pool.img.aptoide.com"
     urls: 
-      - "http://pool.img.aptoide.com/imgs/d/9/8/d980fe54d4d0bda21091af8ca6cee334_cat_graphic.png" # asjdhlakshd
+      - "http://pool.img.aptoide.com/imgs/d/9/8/d980fe54d4d0bda21091af8ca6cee334_cat_graphic.png" 
 
 infserver:
   infhost: "127.0.0.1"

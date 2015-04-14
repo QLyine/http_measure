@@ -42,9 +42,9 @@ data HTTPReq = HTTPReq
 data MyConfig = MyConfig 
   { continent :: Text 
   , infserver :: InfluxDBServer
+  , interval  :: Int
   , cdns      :: [CDN]
-  }
-  deriving (Show)
+  }deriving (Show)
 
 data CDN = CDN 
   { name :: Text
@@ -69,7 +69,8 @@ instance FromJSON MyConfig where
   parseJSON (Object m) = MyConfig <$>
     m .: "continent" <*>
     m .: "infserver" <*>
-    m .: "cdns"
+    m .: "interval"  <*>
+    m .: "cdns" 
   parseJSON x = fail ("not an object: " ++ show x)
 
 instance FromJSON CDN where
@@ -146,7 +147,7 @@ runCDNTest cinf cdn = do
 loop :: MyConfig -> Config -> IO ()
 loop c cinf = forever $ do 
   mapM_ (runCDNTest cinf) (cdns c)
-  threadDelay 5000000 -- 5 seconds
+  threadDelay ( (interval c) * 1000000 ) -- 5 seconds
 
 doRun :: MyConfig -> IO ()
 doRun cfg = do
