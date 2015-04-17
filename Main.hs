@@ -135,18 +135,20 @@ runCmd l = catchAny (action) (err)
     action  = (shelly (curl l)) >>= return . Right
     err     = treatException
 
-treatResult :: Config -> Text -> Either Int Text -> IO ()
-treatResult c t (Right x) = insertToDB c t        $ readHTTPReq x
-treatResult c t (Left e)  = insertToDB c "error"  $ Error e
+treatResult :: MyConfig -> Config -> Text -> Either Int Text -> IO ()
+treatResult mc c t (Right x) = insertToDB c table $ readHTTPReq x
+  where table = T.concat [(continent mc), "_", t]
+treatResult mc c t (Left e)  = insertToDB c table $ Error e
+  where table = T.concat [(continent mc), "_", "error"]
 
-runCDNTest :: Config -> CDN -> IO ()
-runCDNTest cinf cdn = do
+runCDNTest :: MyConfig -> Config -> CDN -> IO ()
+runCDNTest c cinf cdn = do
   r <- mapM runCmd (urls cdn)
-  mapM_ (treatResult cinf (name cdn)) r
+  mapM_ (treatResult c cinf (name cdn)) r
 
 loop :: MyConfig -> Config -> IO ()
 loop c cinf = forever $ do 
-  mapM_ (runCDNTest cinf) (cdns c)
+  mapM_ (runCDNTest c cinf) (cdns c)
   threadDelay ( (interval c) * 1000000 ) -- 5 seconds
 
 doRun :: MyConfig -> IO ()
