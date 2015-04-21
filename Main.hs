@@ -46,11 +46,12 @@ data MyConfig = MyConfig
   , infserver :: InfluxDBServer
   , interval  :: Int
   , cdns      :: [CDN]
+  , urllist   :: ListURLs
   }deriving (Show)
 
 data CDN = CDN 
   { name :: Text
-  , urls :: [Text]
+  , urls :: Text
   }
   deriving (Show)
 
@@ -58,6 +59,11 @@ data InfluxDBServer = InfluxDBServer
   { infhost :: Text
   , infport :: Int
   } deriving (Show)
+
+--data ListURLs = ListURLs {urls :: [Text]} 
+--  deriving (Show)
+
+type ListURLs = [Text]
 
 instance ToSeriesData HTTPReq where
   toSeriesColumns _ = V.fromList ["timeNameLookUp", "timeConnect", "timeAppConnect", "timePreTransfer", "timeRedirect", "timeStartTrans", "timeTotal", "speedDownload"]
@@ -72,7 +78,8 @@ instance FromJSON MyConfig where
     m .: "continent" <*>
     m .: "infserver" <*>
     m .: "interval"  <*>
-    m .: "cdns" 
+    m .: "cdns"      <*>
+    m .: "listurls" 
   parseJSON x = fail ("not an object: " ++ show x)
 
 instance FromJSON CDN where
@@ -85,7 +92,11 @@ instance FromJSON InfluxDBServer where
   parseJSON (Object m) = InfluxDBServer <$>
     m .: "infhost" <*>
     m .: "infport"
-  parseJSON x = fail ("not an object: " ++ show x)
+--   parseJSON x = fail ("not an object: " ++ show x)
+-- 
+-- -- instance FromJSON ListURLs where 
+--   parseJSON (Object m) = ListURLs <$>
+--     m .: "listurls"
 
 numberOfElements :: Int
 numberOfElements = 10
@@ -96,6 +107,9 @@ pick xs = randomRIO (0, (length xs - 1)) >>= return . (xs !!)
 pickN :: Int -> [b] -> IO [b]
 pickN n l = replicateM n $ pick l
 
+pickNConcat :: Int -> Text -> [Text] -> IO [Text]
+pickNConcat n t l = replicateM n $ (pick l) >>= (\x -> return $ T.concat [t, x])
+  
 tryAny :: IO a -> IO (Either SomeException a)
 tryAny action = withAsync action waitCatch
 
@@ -157,7 +171,7 @@ treatResult mc c t (Left e)  = insertToDB c table $ Error e
 
 runCDNTest :: MyConfig -> Config -> CDN -> IO ()
 runCDNTest c cinf cdn = do
-  sample <- pickN numberOfElements $ urls cdn
+  sample <- pickNConcat numberOfElements ( urls cdn ) (urllist c)
   r <- mapM runCmd sample
   mapM_ (treatResult c cinf (name cdn)) r
 
