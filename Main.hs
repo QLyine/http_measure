@@ -4,8 +4,9 @@ import Control.Applicative
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (withAsync, waitCatch)
 import Control.Exception
-import Control.Monad      (forM_, forever)
+import Control.Monad      (forM_, forever, replicateM)
 import Control.Monad.IO.Class
+import Control.Monad.Reader
 
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -21,6 +22,7 @@ import Network.HTTP.Client
 import Prelude hiding (FilePath)
 
 import Shelly
+import System.Random (randomRIO)
 
 default (Text)
 
@@ -85,6 +87,15 @@ instance FromJSON InfluxDBServer where
     m .: "infport"
   parseJSON x = fail ("not an object: " ++ show x)
 
+numberOfElements :: Int
+numberOfElements = 10
+
+pick :: [b] -> IO b
+pick xs = randomRIO (0, (length xs - 1)) >>= return . (xs !!)
+
+pickN :: Int -> [b] -> IO [b]
+pickN n l = replicateM n $ pick l
+
 tryAny :: IO a -> IO (Either SomeException a)
 tryAny action = withAsync action waitCatch
 
@@ -93,6 +104,9 @@ catchAny action onE = tryAny action >>= either onE return
 
 myCredentials :: Credentials
 myCredentials = Credentials "root" "root"
+
+myCred :: IO Credentials
+myCred = return $ Credentials "root" "root"
 
 myDB :: Text 
 myDB = "data"
@@ -143,7 +157,8 @@ treatResult mc c t (Left e)  = insertToDB c table $ Error e
 
 runCDNTest :: MyConfig -> Config -> CDN -> IO ()
 runCDNTest c cinf cdn = do
-  r <- mapM runCmd (urls cdn)
+  sample <- pickN numberOfElements $ urls cdn
+  r <- mapM runCmd sampln e
   mapM_ (treatResult c cinf (name cdn)) r
 
 loop :: MyConfig -> Config -> IO ()
@@ -165,8 +180,39 @@ readMyConfig =
     either (error . show) id <$>
         decodeFileEither "cfg.yaml"
 
+getContinent :: ReaderT MyConfig IO Text
+getContinent = do 
+  a <- ask 
+  return $ continent a
+
+getServer :: ReaderT MyConfig IO InfluxDBServer
+getServer = do 
+  a <- ask
+  return $ infserver a
+
+loopp cif = do 
+  forever $ do
+    print cif 
+
+-- buildConfig :: MonadIO m => m Credentials -> m IORef ServerPool -> m newManager -> m Config
+buildConfig cred s m = do
+  ccred <- cred
+  ss    <- s
+  mm    <- m
+  return $ Config ccred ss mm
+
+doS :: ReaderT MyConfig IO ()
+doS = do 
+  settings      <- getServer 
+  server        <- return $ Server (infhost settings) (infport settings) False
+  myPoolServer  <- return $ newServerPool server []
+  myManager     <- return $ newManager defaultManagerSettings
+  config        <- return $ (liftM3 Config) myCred myPoolServer myManager 
+  liftIO $ print "r"
+
 main :: IO ()
 main = do 
   conf <- readMyConfig
+  -- runReaderT doS conf
   print conf
   doRun conf
