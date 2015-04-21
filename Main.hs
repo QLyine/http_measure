@@ -158,7 +158,7 @@ treatResult mc c t (Left e)  = insertToDB c table $ Error e
 runCDNTest :: MyConfig -> Config -> CDN -> IO ()
 runCDNTest c cinf cdn = do
   sample <- pickN numberOfElements $ urls cdn
-  r <- mapM runCmd sampln e
+  r <- mapM runCmd sample
   mapM_ (treatResult c cinf (name cdn)) r
 
 loop :: MyConfig -> Config -> IO ()
