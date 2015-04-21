@@ -228,5 +228,5 @@ main :: IO ()
 main = do 
   conf <- readMyConfig
   -- runReaderT doS conf
-  print conf
+  -- print conf
   doRun conf
